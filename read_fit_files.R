@@ -24,17 +24,6 @@ not_all_na <- function(x) any(!is.na(x))
 field_value_units <- function(x) str_detect(base::colnames(x), pattern = c("Field|Value|Units"))
 semicircle_to_deg <- function(x) x * (180 / 2^31) # https://docs.microsoft.com/en-us/previous-versions/windows/embedded/cc510650(v=msdn.10)?redirectedfrom=MSDN
 
-format_plot <- function() {
-  ggplot2::theme(text = element_text(size = 20),
-                 plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
-                 panel.background = element_rect(fill = "white",
-                                                 colour = "white"),
-                 panel.grid.major = element_line(size = 0.5,
-                                                 linetype = "solid",
-                                                 color = "light gray")) +
-    ggplot2::theme(legend.title = element_blank())
-}
-
 b <- a %>% 
   dplyr::filter(Type == "Data" & Message == "record") %>%
   dplyr::select(where(not_all_na))
@@ -80,4 +69,3 @@ v[v == 123456789] <- NA
 v$position_lat_deg <- semicircle_to_deg(v$position_lat)
 v$position_long_deg <- semicircle_to_deg(v$position_long) 
 v$time_since_start_minutes <- (v$timestamp - v$timestamp[1])/60
-

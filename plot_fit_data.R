@@ -5,6 +5,17 @@ require(magick)
 require(av)
 require(plotly)
 
+format_plot <- function() {
+  ggplot2::theme(text = element_text(size = 20),
+                 plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+                 panel.background = element_rect(fill = "white",
+                                                 colour = "white"),
+                 panel.grid.major = element_line(size = 0.5,
+                                                 linetype = "solid",
+                                                 color = "light gray")) +
+    ggplot2::theme(legend.title = element_blank())
+}
+
 # # Create bounding box for map coordinates
 position_margin <- 0.005 # Degrees
 bbox <- c(min(v$position_long_deg) - position_margin,
