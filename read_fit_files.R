@@ -3,36 +3,37 @@ require(tibble)
 require(tidyr)
 require(readr)
 require(stringr)
-require(ggplot2)
 
-setwd("C:/tool development/bike data/")
+wd <- choose.dir(default = "C:/", caption = "Select folder containing data")
 
 a <- readr::read_csv(
-  "2022-03-16-205842-ELEMNT BOLT 409A-104-0.csv",
-  # "2022-03-16-003243-ELEMNT BOLT 409A-103-0.csv",
+  paste0(wd, '\\', "2022-03-16-205842-ELEMNT BOLT 409A-104-0.csv"),
   col_names = TRUE,
   col_types = NULL,
-  col_select = NULL,
-  id = NULL,
   locale = default_locale(),
   na = c("", "NA"),
-  # quoted_na = TRUE,
   quote = "\"",
   comment = "",
   trim_ws = TRUE,
   skip = 0,
   n_max = Inf,
-  # guess_max = min(1000, n_max),
-  name_repair = "unique",
-  num_threads = readr_threads(),
   progress = show_progress(),
-  show_col_types = should_show_types(),
-  skip_empty_rows = TRUE,
-  lazy = should_read_lazy()
 )
 
 not_all_na <- function(x) any(!is.na(x))
 field_value_units <- function(x) str_detect(base::colnames(x), pattern = c("Field|Value|Units"))
+semicircle_to_deg <- function(x) x * (180 / 2^31) # https://docs.microsoft.com/en-us/previous-versions/windows/embedded/cc510650(v=msdn.10)?redirectedfrom=MSDN
+
+format_plot <- function() {
+  ggplot2::theme(text = element_text(size = 20),
+                 plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+                 panel.background = element_rect(fill = "white",
+                                                 colour = "white"),
+                 panel.grid.major = element_line(size = 0.5,
+                                                 linetype = "solid",
+                                                 color = "light gray")) +
+    ggplot2::theme(legend.title = element_blank())
+}
 
 b <- a %>% 
   dplyr::filter(Type == "Data" & Message == "record") %>%
@@ -40,39 +41,43 @@ b <- a %>%
 
 b <- b[, field_value_units(b)]
 
-# # Run through each row and assign each cell to the appropriate column in a new table
-f <- b[,str_detect(base::colnames(b), pattern = c("Field"))]
-f <- unique(as.vector(as.matrix(f)))
-f <- f[!is.na(f)]
+# # Determine all of the unique Field names, f, available in the dataset
+f <- b %>% 
+  # # Select columns containing "Field" 
+  dplyr::select(contains("Field")) %>% 
+  # # Convert to matrix so we can then convert to vector
+  as.matrix() %>% 
+  # # Convert matrix to single-row vector
+  as.vector() %>% 
+  # # Grab unique values only (the field names available throughout the original tibble)
+  unique() %>% 
+  # # Omit NA values (null)
+  na.omit()
 
-# # Instantiate an empty tibble of NA values
+# # Instantiate empty tibbles
 v <- as_tibble(matrix(nrow = base::nrow(b), ncol = length(f), dimnames = list(NULL, f)))
+u <- as_tibble(matrix(nrow = 1, ncol = length(f), dimnames = list(NULL, f)))
+v[,] <- 123456789
+u[,] <- 'UNITLESS'
+
 field_available_matrix <- apply(b, 2, function(x) x %in% f)
 
 for(i in 1:nrow(v)){
   field_array <- as.character(b[i, field_available_matrix[i, ]])
-  value_array <- type.convert(b[i, which(field_available_matrix[i, ]) + 1], as.is = TRUE)
-  units_array <- b[i, which(field_available_matrix[i, ]) + 2]
-  v[i, field_array] <- value_array
+  value_array <- as.numeric(b[i, which(field_available_matrix[i, ]) + 1])
+  # value_array <- b[i, which(field_available_matrix[i, ]) + 1]
+  if (is.element('UNITLESS', u[,])){
+    units_array <- b[i, which(field_available_matrix[i, ]) + 2]
+    u[1, field_array] <- as.list(units_array) 
+  }
+  
+  v[i, field_array] <- as.list(value_array)
+  # u[i, units_array] <- as.list(units_array)
 }
 
-# https://docs.microsoft.com/en-us/previous-versions/windows/embedded/cc510650(v=msdn.10)?redirectedfrom=MSDN
-#TODO: 
-v$position_lat_deg <- v$position_lat * (180 / 2^31)
-v$position_long_deg <- v$position_long * (180 / 2^31) 
+v[v == 123456789] <- NA
 
-ggplot2::ggplot(data = v, aes(timestamp, cadence)) +
-  geom_line() + geom_point()
+v$position_lat_deg <- semicircle_to_deg(v$position_lat)
+v$position_long_deg <- semicircle_to_deg(v$position_long) 
+v$time_since_start_minutes <- (v$timestamp - v$timestamp[1])/60
 
-ggplot2::ggplot(data = v, aes(timestamp, heart_rate)) +
-  geom_line() + geom_point()
-
-ggplot2::ggplot(data = v, aes(timestamp, altitude)) +
-  geom_line() + geom_point()
-
-ggplot2::ggplot(data = v, aes(position_long_deg, position_lat_deg)) +
-  geom_point()
-
-## Extra
-# b <- Filter(function(x)!all(is.na(x)), a)
-# str_detect(base::colnames(b), pattern = paste(c("Field", "Units", "Value"), sep="", collapse = "|"))
