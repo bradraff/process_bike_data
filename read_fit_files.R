@@ -23,10 +23,27 @@ a <- readr::read_csv(
 not_all_na <- function(x) any(!is.na(x))
 field_value_units <- function(x) str_detect(base::colnames(x), pattern = c("Field|Value|Units"))
 semicircle_to_deg <- function(x) x * (180 / 2^31) # https://docs.microsoft.com/en-us/previous-versions/windows/embedded/cc510650(v=msdn.10)?redirectedfrom=MSDN
+field_is_time_created <- function(x) str_detect(x, "time_created") & !is.na(x)
+
+# # Extract time created
+time_created_field_number <- a %>% 
+  dplyr::filter(Type == "Data" & Message == "file_id") %>% 
+  {. ->> time_created_row} %>% 
+  dplyr::select(where(field_is_time_created)) %>% 
+  base::colnames() %>% 
+  stringr::str_split(., " ") %>% 
+  `[[`(1) %>% 
+  `[[`(2)
+
+time_created <- time_created_row %>% 
+  dplyr::select(paste0("Value ", time_created_field_number)) %>% 
+  as.numeric()
 
 b <- a %>% 
   dplyr::filter(Type == "Data" & Message == "record") %>%
   dplyr::select(where(not_all_na))
+  # dplyr::select(contains(c("Field", "Values", "Units")))
+  
 
 b <- b[, field_value_units(b)]
 
@@ -69,3 +86,4 @@ v[v == 123456789] <- NA
 v$position_lat_deg <- semicircle_to_deg(v$position_lat)
 v$position_long_deg <- semicircle_to_deg(v$position_long) 
 v$time_since_start_minutes <- (v$timestamp - v$timestamp[1])/60
+v$time_created <- time_created
