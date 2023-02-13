@@ -3,11 +3,12 @@ require(tibble)
 require(tidyr)
 require(readr)
 require(stringr)
+require(dplyr)
 
 wd <- choose.dir(default = "C:/", caption = "Select folder containing data")
 
 a <- readr::read_csv(
-  paste0(wd, '\\', "2022-03-16-205842-ELEMNT BOLT 409A-104-0.csv"),
+  paste0(wd, '\\', "2022-11-10-213741-ELEMNT BOLT 409A-134-0.csv"),
   col_names = TRUE,
   col_types = NULL,
   locale = default_locale(),
@@ -87,3 +88,24 @@ v$position_lat_deg <- semicircle_to_deg(v$position_lat)
 v$position_long_deg <- semicircle_to_deg(v$position_long) 
 v$time_since_start_minutes <- (v$timestamp - v$timestamp[1])/60
 v$time_created <- time_created
+
+# # Compute direction
+# Position difference from last location
+v$position_lat_delta_deg <- c(NA, diff(v$position_lat_deg))
+v$position_long_delta_deg <- c(NA, diff(v$position_long_deg))
+
+# Angle based on position difference
+v$direction_angle <- 
+  atan2(v$position_lat_delta_deg, v$position_long_delta_deg) * 180 / pi
+
+# Discretize cardinal directions into integers of 45-degree separation
+v$direction_int <- round(v$direction_angle / 45, 0)
+dir_int <- tibble(direction = c("north", "northeast", "east", "southeast", 
+                                "south", "southwest", "west_neg", "west_pos",
+                                "northwest"),
+                  direction_int = c(2, 1, 0, -1, -2, -3, -4, 4, 3))
+
+# Assign cardinal direction descriptions to direction integers in the data
+v <- v %>% 
+  left_join(dir_int, by = "direction_int") %>% 
+  mutate(direction = replace(direction, str_detect(direction, "west"), "west"))
